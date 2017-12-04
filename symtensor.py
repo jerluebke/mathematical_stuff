@@ -73,12 +73,7 @@ Requirements:
     sympy
 """
 
-from sympy import Integral, ImmutableMatrix, Symbol
-from sympy import Heaviside
-from sympy import diff, symbols, sympify, simplify
-from sympy import sin, cos
-from sympy import pi
-from sympy import init_printing
+from sympy import *
 
 init_printing(use_unicode=True)
 
@@ -143,7 +138,7 @@ class Integral3D(Integral):
         antiderivative
         solution - call doit
     """
-    def __new__(cls, func, coords, sym_x, sym_y, sym_z, *args, **kwargs):
+    def __new__(cls, func, sym_x, sym_y, sym_z, *args, **kwargs):
         """Tidy this doc_string up!!!
 
         if you use one of the predefined coord systems, make sure to follow
@@ -160,7 +155,7 @@ class Integral3D(Integral):
                        z(q_1, _2, _3),
                       (q_1, q_2, q_3))  # <- defines order
 
-        Don\'t forget to set
+        Don't forget to set
             transform = True
         when your input is not already
         expressed in the desired coordinate system!
@@ -172,9 +167,13 @@ class Integral3D(Integral):
         With transform = True is NOT YET implemented to adjust the integration
         limits accordingly, so do it yourself!
         """
-        if not coords:
-            coords = 'CART'     # set default to cartesian - this doesn't
-                                # change the input function
+        coords = kwargs.get('coords', 'CART')   # set default to cartesian, its JD is 1
+                                                # it doesn't change the input function
+        try:
+            del kwargs['coords']    # needs to be removed, because super().__new__
+        except KeyError:           # doesn't understand this keyword
+            pass
+
         if coords in ('SPHERICAL', 'SPH', 'ZYLINDIRCAL', 'ZYL', 'CARTESIAN', 'CART'):
             jacobian_determinant = JD[coords[:3]]
             coords = TRANSFORM[coords[:3]]
@@ -210,7 +209,7 @@ class Integral3D(Integral):
 
     @property
     def antiderivative(self):
-        return self.func(self.function, None, self.function.free_symbols).doit()
+        return self.func(self.function, *self.function.free_symbols).doit()
 
 
 
@@ -226,13 +225,12 @@ class Jacobian(ImmutableMatrix):
     def __new__(cls, f, *args, **kwargs):
         """returns instance of sympy.ImmutableMatrix"""
         if isinstance(f, str):
-            f = sympify(f)  # input of type str may need to be sympified two
-                            # times
+            f = sympify(f)  # input of type str may need to be sympified two times
                             # type(sympify('x', 'y')) == tuple
                             # type(sympify(sympify('x', 'y'))) == sympy...Tuple
         f = sympify(f)
         J = [[diff(f_i, x_j) for x_j in f.free_symbols] for f_i in f]
-        return ImmutableMatrix.__new__(cls, J, *args, **kwargs)
+        return super().__new__(cls, J, *args, **kwargs)
 
     def det(self, **kwargs):
         """returns Determinant of Matrix (simplified) (sympy expression)"""
@@ -242,17 +240,38 @@ class Jacobian(ImmutableMatrix):
 
 class H(Heaviside):
     """Modification of Heaviside function to adjust limits of integrals by
-    multiplying"""
+    othertiplying"""
     def __new__(cls, arg, **options):
-        return super().__new__(cls, arg, H0=1, **options)
+        return super().__new__(Heaviside, arg, H0=1, **options)
 
-    # The following are propably needed
-    def __mul__(self, mul):
-        """self * mul"""
-    def __rmul__(self, mul):
-        """mul * self"""
-    def __imul__(self, mul):
-        """self *= mul"""
+    def __mul__(self, other):
+        """self * other"""
+        variable = self.free_symbols.intersection(other.variables)
+        if not (isinstance(self, Integral) and variable):
+            return super().__other__(other)
+        # TODO
+        # (i) Only one limit is given
+        # (ii) Some limits are given as not-numbers (e.g. symbols)
+        idx = other.variables.index(*variable)
+        interval = solveset(self.args, domain=S.Reals)
+        if other.limits[idx][2:]:
+            interval = interval.intersection(Interval(other.limits[idx][1:]))
+
+        new_args = list(other.args[1:])
+        del new_args[idx]
+        new_args.insert(idx, (variable, interval.start, interval.end))
+
+        return other.func(other.args[0], *new_args)
+
+
+    def __rmul__(self, other):
+        """other * self"""
+        return self.__mul__(other)
+
+
+    def __imul__(self, other):
+        """self *= other"""
+        return self.__mul__(other)
 
 
 
