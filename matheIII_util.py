@@ -3,7 +3,7 @@
 Physiker 3'
 
 TODO:
-    Gradient, Jacobi-Matrix, Hesse-Matrix for arbitrary dimensions
+    Hesse-Matrix for arbitrary dimensions
     Taylor
 """
 
@@ -42,43 +42,68 @@ def hesse2(func):
 
 
 
-def newton_kantorowitsch_rec(func, X, x0, tol, maxrec):
+def newton_kantorowitsch(func, X, x0, mode='iter', simple=False, tol=1e-9,
+                         maxiter=50, _debug=False):
     """Calculate the zeros of func by numerical approximation using the
     Newton-Kantorowitsch-Method.
-    Calculation is done recursive.
 
     Definition:
-        x_k+1 = x_k - Jacobian(func(x_k))**(-1) * func(x_k)
+        standard: x_k+1 = x_k - Jacobian(func(x_k))**(-1) * func(x_k)
+        simplified: x_k+1 = x_k - Jacobian(func(x_0))**(-1) * func(x_k)
 
     Parameters:
         func: IR^n -> IR^n, f_i(x_1, ..., x_n), given as list or Matrix
         X: set of x_i's in order, given as list or Matrix
-        x0: starting point for recursion
+        x0: starting point
+        mode: recursive or iterative
+        simple: use simplified methode
         tol: tolerance of solution
-        maxrec: maximal recursion depth
-
-    see also:
-        newton_kantorowitsch_iter
-        simple_newton_rec
-        simple_newton_iter
+        maxiter: maximal iterations/recursions
 
     """
+    # prepare and check input, create D_func_inv
+    try:
+        func = Matrix(func)
+        X = Matrix(X)
+        D_func_inv = func.jacobian(X).inv()
+    except (AttributeError, TypeError):
+        D_func_inv = (diff(func, X))**(-1)
+    except NonSquareMatrixError:
+        raise NonSquareMatrixError('func and X need to have same shape!')
+
+    # create callable sequence according to the definition
+    x0 = np.array(x0)
+    arr2mat = [{'MatrixExpr': np.array}, 'numpy']
+    seq1 = lambdify(X, X, modules=arr2mat)
+    seq2 = lambdify(X, D_func_inv*func, modules=arr2mat)
+    if simple:
+        seq = lambda x: (seq1(*x) - seq2(*x0)).flatten()
+    else:
+        seq = lambda x: (seq1(*x) - seq2(*x)).flatten()
+
+    # execution
+    args = (seq, x0, tol, maxiter)
+    if _debug:
+        return seq1, seq2, args     # return arguments for inspection
+    elif mode == 'iter':
+        return _nk_iter(*args)
+    elif mode == 'rec':
+        return _nk_rec(*args)
 
 
-def newton_kantorowitsch_iter(func, X, x0, tol, maxiter):
-    """see newton_kantorowitsch_rec, but calculation is done iterative"""
+def _nk_rec(seq, x_k, tol, maxiter):
+    """newtons method, recursive"""
+    if maxiter == 0 or np.all(x_k < tol):
+        return x_k
+    return _nk_rec(seq, seq(x_k), tol, maxiter-1)
 
 
-def simple_newton_rec(func, X, x0, tol, maxrec):
-    """simplified version of Newton-Kantorowitsch-Method, for reference see
-    newton_kantorowitsch_rec.
-    Calculation is done recursive.
-
-    Definition:
-        TODO
-
-    """
-
-
-def simple_newton_iter(func, X, x0, tol, maxiter):
-    """see simple_newton_rec, but calculation is done iterative"""
+def _nk_iter(seq, x_k, tol, maxiter):
+    """newtons method, iterative"""
+    i = 0
+    while i < maxiter:
+        if np.all(x_k < tol):
+            return x_k
+        x_k = seq(x_k)
+        i += 1
+    return x_k
