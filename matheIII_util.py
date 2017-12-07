@@ -11,13 +11,24 @@ from sympy import *
 import numpy as np
 
 
+# initialization
+x, y, z, t = symbols('x y z t')
+x_1, x_2, x_3 = symbols('x_1, x_2, x_3')
+f, g, h = symbols('f g h', cls=Function)
+
+init_printing()
+
+
 def pd2(func, x, y):
     """differentiate partially func regarding x and y"""
     return diff(diff(func, x), y).simplify()
 
 
 def grad(func):
-    """return gradient of func, func: IR^n -> IR"""
+    """return gradient of func, func: IR^n -> IR
+
+    TODO:
+    add free symbols as list as parameter"""
     return Matrix([[diff(f, x_j) for x_j in func.free_symbols]])
 
 
@@ -42,8 +53,8 @@ def hesse2(func):
 
 
 
-def newton_kantorowitsch(func, X, x0, mode='iter', simple=False, tol=1e-9,
-                         maxiter=50, _debug=False):
+def newton_kantorowitsch(func, X, x0, simple=False, tol=1e-9,
+                         maxiter=50, printall=False, test=False, _debug=False):
     """Calculate the zeros of func by numerical approximation using the
     Newton-Kantorowitsch-Method.
 
@@ -55,55 +66,89 @@ def newton_kantorowitsch(func, X, x0, mode='iter', simple=False, tol=1e-9,
         func: IR^n -> IR^n, f_i(x_1, ..., x_n), given as list or Matrix
         X: set of x_i's in order, given as list or Matrix
         x0: starting point
-        mode: recursive or iterative
         simple: use simplified methode
         tol: tolerance of solution
         maxiter: maximal iterations/recursions
+        printall: verbose execution
+        test: test during execution and return if x_k < tol, test final result
 
     """
     # prepare and check input, create D_func_inv
+    try:
+        x0 = [float(x0_i) for x0_i in x0]
+    except TypeError:
+        raise TypeError('x0 has to be a tuple or list of numbers!')
     try:
         func = Matrix(func)
         X = Matrix(X)
         D_func_inv = func.jacobian(X).inv()
     except (AttributeError, TypeError):
+        X = X[0]
         D_func_inv = (diff(func, X))**(-1)
     except NonSquareMatrixError:
         raise NonSquareMatrixError('func and X need to have same shape!')
 
     # create callable sequence according to the definition
     x0 = np.array(x0)
-    arr2mat = [{'MatrixExpr': np.array}, 'numpy']
-    seq1 = lambdify(X, X, modules=arr2mat)
-    seq2 = lambdify(X, D_func_inv*func, modules=arr2mat)
+    mat2arr = [{'MatrixExpr': np.array}, 'numpy']
     if simple:
-        seq = lambda x: (seq1(*x) - seq2(*x0)).flatten()
-    else:
-        seq = lambda x: (seq1(*x) - seq2(*x)).flatten()
+        # Df(x)**(-1) = Df(x0)**(-1)
+        D_func_inv = _subs(D_func_inv, X, x0)
+
+    # x_k+1 = x_k - Df(x_k)**(-1) * f(x_k)
+    _seq = lambdify(X, X-D_func_inv*func, modules=mat2arr)
+    _func = lambda x: (lambdify(X, func, modules=mat2arr))(*x).flatten()
+    seq = lambda x: (_seq(*x)).flatten()
+
+    if printall:
+        # print('\n'+pretty(X), '-', pretty(D_func_inv), '*', pretty(func)+'\n')
+        print('\nFunction:\n\n', pretty(func))
+        print('\nInverse Jacobian:\n\n', pretty(D_func_inv), '\n\n')
 
     # execution
-    args = (seq, x0, tol, maxiter)
+    args = (seq, x0, _func, tol, maxiter, printall, test)
     if _debug:
-        return seq1, seq2, args     # return arguments for inspection
-    elif mode == 'iter':
-        return _nk_iter(*args)
-    elif mode == 'rec':
-        return _nk_rec(*args)
+        return args         # return arguments for inspection
+    res = _nk_iter(*args)
+    if printall and test:
+        print('\nTest: f(x_res) = '+pretty(_func(res))+'\n')
+    return res
 
 
-def _nk_rec(seq, x_k, tol, maxiter):
-    """newtons method, recursive"""
-    if maxiter == 0 or np.all(x_k < tol):
-        return x_k
-    return _nk_rec(seq, seq(x_k), tol, maxiter-1)
+nk = newton_kantorowitsch
 
 
-def _nk_iter(seq, x_k, tol, maxiter):
+def _nk_iter(seq, x_k, _func, tol, maxiter, printall, test):
     """newtons method, iterative"""
     i = 0
     while i < maxiter:
-        if np.all(x_k < tol):
+        if test and np.all(np.abs(_func(x_k)) < tol):
             return x_k
-        x_k = seq(x_k)
         i += 1
+        if printall:
+            print(i, x_k)
+        x_k = seq(x_k)
     return x_k
+
+
+def _subs(expr, X, X_subs):
+    """helper function for multiple substitutions
+    expr is the expression whose variables are to be substituted
+    X is a list or Matrix with the regarded variables in order
+    X_subs are the new values in order
+    """
+    i = 0
+    while i < len(X):
+        expr = expr.subs(X[i], X_subs[i])
+        i += 1
+    return expr
+
+
+
+def example(which=0):
+    """create some example data
+    TODO: expand"""
+    if which == 0:
+        f_sym = (x**3 - 3*x*y**2 - 1, 3*x**2*y - y**3)
+        f_lam = lambdify((x, y), f_sym)
+    return f_sym, f_lam
