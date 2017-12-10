@@ -54,7 +54,7 @@ def hesse2(func):
 
 
 def newton_kantorowitsch(func, X, x0, simple=False, tol=1e-9,
-                         maxiter=50, printall=False, test=False, _debug=False):
+                         maxiter=50, printall=False, _debug=False):
     """Calculate the zeros of func by numerical approximation using the
     Newton-Kantorowitsch-Method.
 
@@ -67,10 +67,9 @@ def newton_kantorowitsch(func, X, x0, simple=False, tol=1e-9,
         X: set of x_i's in order, given as list or Matrix
         x0: starting point
         simple: use simplified methode
-        tol: tolerance of solution
+        tol: tolerance for convergance of x_k
         maxiter: maximal iterations/recursions
         printall: verbose execution
-        test: test during execution and return if x_k < tol, test final result
 
     """
     # prepare and check input, create D_func_inv
@@ -83,6 +82,7 @@ def newton_kantorowitsch(func, X, x0, simple=False, tol=1e-9,
         X = Matrix(X)
         D_func_inv = func.jacobian(X).inv()
     except (AttributeError, TypeError):
+        x0 = x0[0]
         X = X[0]
         D_func_inv = (diff(func, X))**(-1)
     except NonSquareMatrixError:
@@ -95,22 +95,21 @@ def newton_kantorowitsch(func, X, x0, simple=False, tol=1e-9,
         # Df(x)**(-1) = Df(x0)**(-1)
         D_func_inv = _subs(D_func_inv, X, x0)
 
-    # x_k+1 = x_k - Df(x_k)**(-1) * f(x_k)
+    # Sequence: x_k+1 = x_k - Df(x_k)**(-1) * f(x_k)
     _seq = lambdify(X, X-D_func_inv*func, modules=mat2arr)
-    _func = lambda x: (lambdify(X, func, modules=mat2arr))(*x).flatten()
     seq = lambda x: (_seq(*x)).flatten()
 
     if printall:
-        # print('\n'+pretty(X), '-', pretty(D_func_inv), '*', pretty(func)+'\n')
         print('\nFunction:\n\n', pretty(func))
         print('\nInverse Jacobian:\n\n', pretty(D_func_inv), '\n\n')
 
     # execution
-    args = (seq, x0, _func, tol, maxiter, printall, test)
+    args = (seq, x0, tol, maxiter, printall)
     if _debug:
         return args         # return arguments for inspection
     res = _nk_iter(*args)
-    if printall and test:
+    if printall:
+        _func = lambda x: (lambdify(X, func, modules=mat2arr))(*x).flatten()
         print('\nTest: f(x_res) = '+pretty(_func(res))+'\n')
     return res
 
@@ -118,16 +117,17 @@ def newton_kantorowitsch(func, X, x0, simple=False, tol=1e-9,
 nk = newton_kantorowitsch
 
 
-def _nk_iter(seq, x_k, _func, tol, maxiter, printall, test):
+def _nk_iter(seq, x_k, tol, maxiter, printall):
     """newtons method, iterative"""
     i = 0
     while i < maxiter:
-        if test and np.all(np.abs(_func(x_k)) < tol):
-            return x_k
         i += 1
         if printall:
             print(i, x_k)
-        x_k = seq(x_k)
+        x_next = seq(x_k)
+        if np.all(np.abs(x_k - x_next) < tol):
+            return x_k
+        x_k = x_next
     return x_k
 
 
