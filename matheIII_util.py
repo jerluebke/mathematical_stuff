@@ -9,6 +9,8 @@ TODO:
 
 from sympy import *
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import odeint
 
 
 # initialization
@@ -145,10 +147,69 @@ def _subs(expr, X, X_subs):
 
 
 
+def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
+                            axis=None, odeint_kwargs={}, plt_kwargs={'c': 'b'}):
+    """function for plotting the phase space trajectories of ordinary
+    differential equations (ODEs) of the form dy/dt = f(y, t), where y can be
+    a n-dim vector (see scipy.integrate.odeint for reference).
+    Inspired by plotdf; reference: github.com/jmoy
+
+    Parameters:
+        f - RHS of ODE; callable(y, t)
+        inits - initial values for plotting trajectories
+        xbound, ybound - sequences with len = 2 gives min and max values for x
+            and y respectivly
+        tbound - sequence with len = 3 gives min, max and step for t values to
+            calculate the trajectories for
+        axis - matplotlib axis to draw plot in; if None, current will be used
+        odeint_kwargs - dict containing kwargs for scipy.integrate.odeint
+        plt_kwargs - dict containing kwargs for matplotlib.pyplot
+
+    Returns:
+        list containing matplotlib-artist objects (Line2D)
+    """
+    # TODO:
+    # Ausreißer beim plotten
+    if not axis:
+        axis = plt.gca()
+
+    def f_neg(x, t):
+        return -f(x, t)
+
+    artists = []
+    t = np.linspace(tbound[0], tbound[1], tbound[2])
+    for i in inits:
+        sol_fwd = odeint(f, i, t, **odeint_kwargs)          # forward solution
+        sol_bwd = odeint(f_neg, i, t, **odeint_kwargs)      # backward solution
+        sol = np.vstack((np.flipud(sol_bwd), sol_fwd))      # flip sol_bwd and put both together
+        sol_x = sol[:,0]                                    # left column of sol
+        sol_y = sol[:,1]                                    # right column of sol
+        for e in range(sol_y.size):
+            if sol_y[e] > ybound[1] or sol_y[e] < ybound[0]:
+                sol = sol[:e]   # The solution may diverge                            
+                break           # To prevent ugly results (even within ybound), the data
+                                # is croppped by the first value, which exceeds ybound
+                                # A masked array may be more suitable here, though
+        artists.extend(axis.plot(sol_x, sol_y, **plt_kwargs))
+
+    plt.xlim(xbound)
+    plt.ylim(ybound)
+    return artists
+
+
+ppt = plot_phase_trajectories
+
+
 def example(which=0):
     """create some example data
     TODO: expand"""
     if which == 0:
         f_sym = (x**3 - 3*x*y**2 - 1, 3*x**2*y - y**3)
         f_lam = lambdify((x, y), f_sym)
-    return f_sym, f_lam
+        return f_sym, f_lam
+    elif which == 1:
+        def f1(x, t):
+            return np.array([1, x[1]*(1-x[1]**2)])
+        return f1
+    elif which == 'inits':
+        return np.array([(i, j) for i in np.arange(-5, 4, 1) for j in (1.2, .5, -.5, -1.2)])
