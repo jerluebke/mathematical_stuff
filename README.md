@@ -1,0 +1,3 @@
+# mathematical_stuff
+Some implementations of concepts form the lectures "Mathematik für Physiker III" and "Theoretische Physik II";
+more to come...
