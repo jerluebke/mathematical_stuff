@@ -169,7 +169,7 @@ def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
         list containing matplotlib-artist objects (Line2D)
     """
     # TODO:
-    # Ausreißer beim plotten
+    # weird behaviour while plotting
     if not axis:
         axis = plt.gca()
 
@@ -184,13 +184,9 @@ def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
         sol = np.vstack((np.flipud(sol_bwd), sol_fwd))      # flip sol_bwd and put both together
         sol_x = sol[:,0]                                    # left column of sol
         sol_y = sol[:,1]                                    # right column of sol
-        for e in range(sol_y.size):
-            if sol_y[e] > ybound[1] or sol_y[e] < ybound[0]:
-                sol = sol[:e]   # The solution may diverge                            
-                break           # To prevent ugly results (even within ybound), the data
-                                # is croppped by the first value, which exceeds ybound
-                                # A masked array may be more suitable here, though
-        artists.extend(axis.plot(sol_x, sol_y, **plt_kwargs))
+        sol_x_masked = np.ma.masked_outside(sol_x, *xbound) # mask data to prevent
+        sol_y_masked = np.ma.masked_outside(sol_y, *ybound) #  blow-up of solution
+        artists.append(axis.plot(sol_x_masked, sol_y_masked, label=i, **plt_kwargs))
 
     plt.xlim(xbound)
     plt.ylim(ybound)
@@ -202,14 +198,23 @@ ppt = plot_phase_trajectories
 
 def example(which=0):
     """create some example data
-    TODO: expand"""
+    TODO:
+        expand
+        reorganize if-else as example-dict
+    """
     if which == 0:
         f_sym = (x**3 - 3*x*y**2 - 1, 3*x**2*y - y**3)
         f_lam = lambdify((x, y), f_sym)
         return f_sym, f_lam
     elif which == 1:
-        def f1(x, t):
-            return np.array([1, x[1]*(1-x[1]**2)])
-        return f1
-    elif which == 'inits':
-        return np.array([(i, j) for i in np.arange(-5, 4, 1) for j in (1.2, .5, -.5, -1.2)])
+        def fs(s, n):
+            def f(x, t):
+                return np.array([1, s*x[1]**n*(1-x[1]**2)])
+            return f
+        return [fs(s, n) for s in (-1, 1) for n in (1, 2)]
+    elif which == 'inits_large':
+        return np.array([(i, j) for i in np.arange(-10, 11, 1)
+                         for j in (1.2, 1, .5, 0, -.5, 1, -1.2)])
+    elif which == 'inits_small':
+        return np.array([(i, j) for i in np.arange(-2, 3, 1)
+                         for j in (1.2, .5, -.5, -1.2)])
