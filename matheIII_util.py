@@ -3,7 +3,6 @@
 Physiker 3'
 
 TODO:
-    Hesse-Matrix for arbitrary dimensions
     Taylor
 """
 
@@ -24,34 +23,6 @@ init_printing()
 def pd2(func, x, y):
     """differentiate partially func regarding x and y"""
     return diff(diff(func, x), y).simplify()
-
-
-def grad(func):
-    """return gradient of func, func: IR^n -> IR
-
-    TODO:
-    add free symbols as list as parameter"""
-    return Matrix([[diff(f, x_j) for x_j in func.free_symbols]])
-
-
-def jacobi(func):
-    """return Jacobian of func, func: IR^n -> IR^m
-    If func is not iterabel, i.e. func: IR^n -> IR, return its gradient
-
-    TODO:
-    add free symbols as list as parameter"""
-    try:
-        return Matrix([[diff(f_i, x_j) for x_j in func.free_symbols] for f_i in func])
-    except TypeError:
-        return grad(func)
-
-
-def hesse2(func):
-    """return Hesse-Matrix (all second partial derivatives) of func
-    func: IR^2 -> IR"""
-    x, y = func.free_symbols
-    return Matrix([[pd2(func, x, x), pd2(func, x, y)],
-                   [pd2(func, y, x), pd2(func, y, y)]])
 
 
 
@@ -148,7 +119,6 @@ def _subs(expr, X, X_subs):
 
 
 def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
-                            dos=(-np.inf, np.inf),
                             axis=None, odeint_kwargs={}, plt_kwargs={'c': 'b'}):
     """function for plotting the phase space trajectories of ordinary
     differential equations (ODEs) of the form dy/dt = f(y, t), where y can be
@@ -171,6 +141,7 @@ def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
     """
     # TODO:
     # weird behaviour while plotting
+    # try with sympy.integrate.solve_ivp or sage math
     if not axis:
         axis = plt.gca()
 
