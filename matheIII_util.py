@@ -16,6 +16,7 @@ from scipy.integrate import odeint
 # initialization
 x, y, z, t = symbols('x y z t')
 x_1, x_2, x_3 = symbols('x_1, x_2, x_3')
+x0, t0 = symbols('x0, t0')
 f, g, h = symbols('f g h', cls=Function)
 
 init_printing()
@@ -148,6 +149,7 @@ def _subs(expr, X, X_subs):
 
 
 def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
+                            dos=(-np.inf, np.inf),
                             axis=None, odeint_kwargs={}, plt_kwargs={'c': 'b'}):
     """function for plotting the phase space trajectories of ordinary
     differential equations (ODEs) of the form dy/dt = f(y, t), where y can be
@@ -177,7 +179,7 @@ def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
         return -f(x, t)
 
     artists = []
-    t = np.linspace(tbound[0], tbound[1], tbound[2])
+    t = np.linspace(*tbound)
     for i in inits:
         sol_fwd = odeint(f, i, t, **odeint_kwargs)          # forward solution
         sol_bwd = odeint(f_neg, i, t, **odeint_kwargs)      # backward solution
@@ -186,7 +188,7 @@ def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
         sol_y = sol[:,1]                                    # right column of sol
         sol_x_masked = np.ma.masked_outside(sol_x, *xbound) # mask data to prevent
         sol_y_masked = np.ma.masked_outside(sol_y, *ybound) #  blow-up of solution
-        artists.append(axis.plot(sol_x_masked, sol_y_masked, label=i, **plt_kwargs))
+        artists.append(axis.plot(sol_x_masked, sol_y_masked, **plt_kwargs))
 
     plt.xlim(xbound)
     plt.ylim(ybound)
@@ -194,6 +196,36 @@ def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
 
 
 ppt = plot_phase_trajectories
+
+
+def get_dos_symbolic(ode, const, var=t, iv=(t0, x0)):
+    """not very useful, will be deleted...
+    
+    tries to find Domain of Solution of ODE using sympy and regex
+    this implementation is quite fucking ugly...
+    Since it's very specific it is not that useful, too
+    
+    Don't forget to define const! e.g. C1 = symbols('C1')"""
+    # import re here to avoid conflivt with sympy.re
+    import re
+    # solve given ode symbolicaly
+    gen_sol = dsolve(ode)
+    if isinstance(gen_sol, list):
+        pprint(gen_sol)
+        idx = int(raw_input('specify index: '))     # python2 only!!!
+        gen_sol = gen_sol[idx]
+    # in rhs of solution substitute t with t0
+    iv_expr = Eq(gen_sol.rhs.subs(var, iv[0]), iv[1])
+    # calculate constant C1
+    c1 = solve(iv_expr, const)[0]   # gets only the first element
+    # substitute C1 with c1 and solve for t
+    set_expr = solveset(gen_sol.subs(const, c1), var)
+    # extract not-defined point
+    # that is an endpoint of the dos
+    str_expr = re.search('(?<=\\\\ \{)[\d\D]+', str(set_expr)).group(0)[:-1]
+    L = lambdify(iv, eval(str_expr))
+    return L, str_expr
+
 
 
 def example(which=0):
