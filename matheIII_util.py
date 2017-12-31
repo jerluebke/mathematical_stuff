@@ -206,7 +206,7 @@ def ppt_solve_ivp(f, inits, xbound, ybound, t=(0, 10), steps=100,
             sol_eval = sol(tt)
             sol_x_ma = np.ma.masked_outside(sol_eval[0], *xbound)
             sol_y_ma = np.ma.masked_outside(sol_eval[1], *ybound)
-            artists.append(plt.plot(sol_x_ma, sol_y_ma, **plt_kwargs))
+            artists.append(axis.plot(sol_x_ma, sol_y_ma, **plt_kwargs))
     return artists
 
 
@@ -223,7 +223,7 @@ def example(which=0):
         return f_sym, f_lam
     elif which == 1:
         def fs(s, n):
-            def f(x, t):
+            def f(t, x):
                 return np.array([1, s*x[1]**n*(1-x[1]**2)])
             return f
         return [fs(s, n) for s in (-1, 1) for n in (1, 2)]
