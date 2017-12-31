@@ -119,7 +119,8 @@ def _subs(expr, X, X_subs):
 
 
 def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
-                            axis=None, odeint_kwargs={}, plt_kwargs={'c': 'b'}):
+                            use_sage=False, axis=None,
+                            odeint_kwargs={}, plt_kwargs={'color': 'blue'}):
     """function for plotting the phase space trajectories of ordinary
     differential equations (ODEs) of the form dy/dt = f(y, t), where y can be
     a n-dim vector (see scipy.integrate.odeint for reference).
@@ -132,23 +133,30 @@ def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
             and y respectivly
         tbound - sequence with len = 3 gives min, max and step for t values to
             calculate the trajectories for
+        use_sage - whether to use sage for plotting instead of matplotlib
         axis - matplotlib axis to draw plot in; if None, current will be used
         odeint_kwargs - dict containing kwargs for scipy.integrate.odeint
-        plt_kwargs - dict containing kwargs for matplotlib.pyplot
+        plt_kwargs - dict containing kwargs for matplotlib.pyplot; can also be
+            used for sage-Graphics objects
 
     Returns:
         list containing matplotlib-artist objects (Line2D)
+        or one sage-Graphics object
     """
     # TODO:
     # weird behaviour while plotting
     # try with sympy.integrate.solve_ivp or sage math
-    if not axis:
+    if use_sage:
+        from sage.plot.graphics import Graphics
+        from sage.plot.line import line
+
+    elif not axis:
         axis = plt.gca()
 
     def f_neg(x, t):
         return -f(x, t)
 
-    artists = []
+    artists = [] if not use_sage else Graphics()
     t = np.linspace(*tbound)
     for i in inits:
         sol_fwd = odeint(f, i, t, **odeint_kwargs)          # forward solution
@@ -158,10 +166,17 @@ def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
         sol_y = sol[:,1]                                    # right column of sol
         sol_x_masked = np.ma.masked_outside(sol_x, *xbound) # mask data to prevent
         sol_y_masked = np.ma.masked_outside(sol_y, *ybound) #  blow-up of solution
-        artists.append(axis.plot(sol_x_masked, sol_y_masked, **plt_kwargs))
+        if not use_sage:
+            artists.append(axis.plot(sol_x_masked, sol_y_masked,
+                                     **plt_kwargs))
+        else:
+            artists += line(zip(sol_x_masked, sol_y_masked), plt_kwargs,
+                            xmin=xbound[0], xmax=xbound[1])
 
-    plt.xlim(xbound)
-    plt.ylim(ybound)
+    if not use_sage:
+        plt.xlim(xbound)
+        plt.ylim(ybound)
+
     return artists
 
 
