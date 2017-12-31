@@ -9,7 +9,7 @@ TODO:
 from sympy import *
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.integrate import odeint
+from scipy.integrate import odeint, solve_ivp
 
 
 # initialization
@@ -118,16 +118,16 @@ def _subs(expr, X, X_subs):
 
 
 
-def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
+def plot_phase_trajectories(func, inits, xbound, ybound, tbound=(0, 10, 100),
                             use_sage=False, axis=None,
                             odeint_kwargs={}, plt_kwargs={'color': 'blue'}):
-    """function for plotting the phase space trajectories of ordinary
+    """function for plotting the  phase space trajectories of ordinary
     differential equations (ODEs) of the form dy/dt = f(y, t), where y can be
     a n-dim vector (see scipy.integrate.odeint for reference).
     Inspired by plotdf; reference: github.com/jmoy
 
     Parameters:
-        f - RHS of ODE; callable(y, t)
+        func - RHS of ODE; callable(t, y)
         inits - initial values for plotting trajectories
         xbound, ybound - sequences with len = 2 gives min and max values for x
             and y respectivly
@@ -143,14 +143,12 @@ def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
         list containing matplotlib-artist objects (Line2D)
         or one sage-Graphics object
     """
-    # TODO:
-    # weird behaviour while plotting
-    # try with sympy.integrate.solve_ivp or sage math
+    f = lambda x, t: func(t, x)
     if use_sage:
         from sage.plot.graphics import Graphics
         from sage.plot.line import line
 
-    elif not axis:
+    elif axis is None:
         axis = plt.gca()
 
     def f_neg(x, t):
@@ -181,6 +179,35 @@ def plot_phase_trajectories(f, inits, xbound, ybound, tbound=(0, 10, 100),
 
 
 ppt = plot_phase_trajectories
+
+
+def ppt_solve_ivp(f, inits, xbound, ybound, t=(0, 10), steps=100,
+                  axis=None, sivp_kwargs={}, plt_kwargs={'c': 'b'}):
+    """Plots phase trajectory of given ODE with scipy.integrate.solve_ivp
+    For reference see ´plot_phase_trajectories´
+    Input is mostly the same, apart from t, which is to be a 2-tuple
+    Returns list of matplotlib-artist objects"""
+    if axis is None:
+        axis = plt.gca()
+
+    def f_neg(t, x):
+        return -f(t, x)
+
+    artists = []
+    tt = np.linspace(*t, steps)
+    for ff in (f, f_neg):
+        for i in inits:
+            # solve_ivp(..., dense_output=True).sol holds a ´OdeSolution´ object
+            # which interpolates the solution and allows its evaluation at
+            # arbitrary points
+            # Returns array with shape(n,) corresponding to the RHS of the
+            # given ODE
+            sol = solve_ivp(ff, t, i, dense_output=1, **sivp_kwargs).sol
+            sol_eval = sol(tt)
+            sol_x_ma = np.ma.masked_outside(sol_eval[0], *xbound)
+            sol_y_ma = np.ma.masked_outside(sol_eval[1], *ybound)
+            artists.append(plt.plot(sol_x_ma, sol_y_ma, **plt_kwargs))
+    return artists
 
 
 
