@@ -228,8 +228,8 @@ def example(which=0):
             return f
         return [fs(s, n) for s in (-1, 1) for n in (1, 2)]
     elif which == 'inits_large':
-        return np.array([(i, j) for i in np.arange(-10, 11, 1)
-                         for j in (1.2, 1, .5, 0, -.5, 1, -1.2)])
+        return np.array([(i, j) for i in np.arange(-10, 11, 2)
+                         for j in np.arange(-1.5, 2, 1)])
     elif which == 'inits_small':
         return np.array([(i, j) for i in np.arange(-2, 3, 1)
                          for j in (1.2, .5, -.5, -1.2)])
