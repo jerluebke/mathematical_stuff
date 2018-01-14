@@ -119,7 +119,7 @@ def _subs(expr, X, X_subs):
 
 
 def plot_phase_trajectories(func, inits, xbound, ybound, tbound=(0, 10, 100),
-                            use_sage=False, axis=None,
+                            use_sage=False, axis=None, f_kwargs={},
                             odeint_kwargs={}, plt_kwargs={'color': 'blue'}):
     """function for plotting the  phase space trajectories of ordinary
     differential equations (ODEs) of the form dy/dt = f(y, t), where y can be
@@ -143,7 +143,7 @@ def plot_phase_trajectories(func, inits, xbound, ybound, tbound=(0, 10, 100),
         list containing matplotlib-artist objects (Line2D)
         or one sage-Graphics object
     """
-    f = lambda x, t: func(t, x)
+    f = lambda x, t: func(t, x, **f_kwargs)
     if use_sage:
         from sage.plot.graphics import Graphics
         from sage.plot.line import line
@@ -181,12 +181,14 @@ def plot_phase_trajectories(func, inits, xbound, ybound, tbound=(0, 10, 100),
 ppt = plot_phase_trajectories
 
 
-def ppt_solve_ivp(f, inits, xbound, ybound, t=(0, 10), steps=100,
-                  axis=None, sivp_kwargs={}, plt_kwargs={'c': 'b'}):
+def ppt_solve_ivp(func, inits, xbound, ybound, t=(0, 10), steps=100,
+                  axis=None, f_kwargs={}, sivp_kwargs={},
+                  plt_kwargs={'c': 'b'}):
     """Plots phase trajectory of given ODE with scipy.integrate.solve_ivp
     For reference see ´plot_phase_trajectories´
     Input is mostly the same, apart from t, which is to be a 2-tuple
     Returns list of matplotlib-artist objects"""
+    f = lambda t, x: func(t, x, **f_kwargs)
     if axis is None:
         axis = plt.gca()
 
@@ -200,7 +202,7 @@ def ppt_solve_ivp(f, inits, xbound, ybound, t=(0, 10), steps=100,
             # solve_ivp(..., dense_output=True).sol holds a ´OdeSolution´ object
             # which interpolates the solution and allows its evaluation at
             # arbitrary points
-            # Returns array with shape(n,) corresponding to the RHS of the
+            # Returns array with shape (n,) corresponding to the RHS of the
             # given ODE
             sol = solve_ivp(ff, t, i, dense_output=1, **sivp_kwargs).sol
             sol_eval = sol(tt)
